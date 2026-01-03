@@ -62,17 +62,34 @@ Return ONLY a JSON array of strings, nothing else. Example: ["Name1", "Name2", "
                 "temperature": 0.8,
                 "max_tokens": 200
             },
-            timeout=10
+            timeout=30
         )
-        response.raise_for_status()
+
+        # Log response details for debugging
+        app.logger.info(f"OpenRouter response status: {response.status_code}")
+        if response.status_code != 200:
+            app.logger.warning(f"OpenRouter error response: {response.text}")
+            return None
 
         result = response.json()
+
+        # Check for API error in response
+        if "error" in result:
+            app.logger.warning(f"OpenRouter API error: {result['error']}")
+            return None
+
         content = result["choices"][0]["message"]["content"].strip()
 
         # Parse the JSON array from response
         names = json.loads(content)
         if isinstance(names, list) and all(isinstance(n, str) for n in names):
             return names[:count]
+    except requests.exceptions.RequestException as e:
+        app.logger.warning(f"OpenRouter request failed: {e}")
+    except json.JSONDecodeError as e:
+        app.logger.warning(f"Failed to parse response JSON: {e}")
+    except KeyError as e:
+        app.logger.warning(f"Unexpected response format, missing key: {e}")
     except Exception as e:
         app.logger.warning(f"OpenRouter API error: {e}")
 
