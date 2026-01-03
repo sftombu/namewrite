@@ -54,7 +54,7 @@ Return ONLY a JSON array of strings, nothing else. Example: ["Name1", "Name2", "
                 "X-Title": "NameWrite"
             },
             json={
-                "model": "openai/gpt-3.5-turbo",  # Fast and cheap default
+                "model": "openai/gpt-5-nano",
                 "messages": [
                     {"role": "system", "content": "You are a creative naming assistant. Always respond with only a valid JSON array of strings."},
                     {"role": "user", "content": prompt}
@@ -132,5 +132,24 @@ def health():
     return jsonify({"status": "healthy", "app": "NameWrite"})
 
 
+def print_startup_info():
+    """Print OpenRouter configuration status on startup."""
+    print("\n" + "=" * 50)
+    print("NameWrite - AI-Powered Name Generator")
+    print("=" * 50)
+    if OPENROUTER_API_KEY:
+        print("OpenRouter: ENABLED")
+        print("Model: openai/gpt-5-nano")
+        print("Names will be generated using AI")
+    else:
+        print("OpenRouter: DISABLED")
+        print("Reason: OPENROUTER_API_KEY environment variable not set")
+        print("Names will use fallback random selection")
+        print("\nTo enable OpenRouter, run:")
+        print("  export OPENROUTER_API_KEY='your-api-key-here'")
+    print("=" * 50 + "\n")
+
+
 if __name__ == "__main__":
+    print_startup_info()
     app.run(debug=True, host="0.0.0.0", port=8080)
