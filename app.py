@@ -54,7 +54,7 @@ Return ONLY a JSON array of strings, nothing else. Example: ["Name1", "Name2", "
                 "X-Title": "NameWrite"
             },
             json={
-                "model": "openai/gpt-5-nano",
+                "model": "openai/gpt-4o-mini",
                 "messages": [
                     {"role": "system", "content": "You are a creative naming assistant. Always respond with only a valid JSON array of strings."},
                     {"role": "user", "content": prompt}
@@ -163,7 +163,7 @@ def print_startup_info():
     print("=" * 50)
     if OPENROUTER_API_KEY:
         print("OpenRouter: ENABLED")
-        print("Model: openai/gpt-5-nano")
+        print("Model: openai/gpt-4o-mini")
         print("Names will be generated using AI")
     else:
         print("OpenRouter: DISABLED")
