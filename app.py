@@ -1,32 +1,82 @@
 """
 NameWrite - A web application for naming things using LLMs
 Flask backend with Vue.js + Vuetify frontend
+Uses OpenRouter API for LLM-powered name generation
 """
 
-from flask import Flask, render_template, jsonify, request
+import os
+import json
 import random
+import requests
+from flask import Flask, render_template, jsonify, request
 
 app = Flask(__name__)
 
-# Sample naming suggestions (in a real app, this would use an LLM API)
-NAMING_CATEGORIES = {
-    "project": [
-        "Aurora", "Nexus", "Spark", "Horizon", "Pulse",
-        "Echo", "Nova", "Zenith", "Apex", "Ember"
-    ],
-    "variable": [
-        "dataProcessor", "resultHandler", "configManager",
-        "eventDispatcher", "stateController", "cacheStore"
-    ],
-    "company": [
-        "TechFlow", "InnoVerse", "CloudPeak", "DataSphere",
-        "ByteWave", "CodeCraft", "PixelForge", "NetPulse"
-    ],
-    "pet": [
-        "Luna", "Max", "Bella", "Charlie", "Milo",
-        "Daisy", "Rocky", "Coco", "Buddy", "Sadie"
-    ]
+# OpenRouter configuration
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+# Fallback names when API is unavailable
+FALLBACK_NAMES = {
+    "project": ["Aurora", "Nexus", "Spark", "Horizon", "Pulse", "Echo", "Nova", "Zenith", "Apex", "Ember"],
+    "variable": ["dataProcessor", "resultHandler", "configManager", "eventDispatcher", "stateController", "cacheStore"],
+    "company": ["TechFlow", "InnoVerse", "CloudPeak", "DataSphere", "ByteWave", "CodeCraft", "PixelForge", "NetPulse"],
+    "pet": ["Luna", "Max", "Bella", "Charlie", "Milo", "Daisy", "Rocky", "Coco", "Buddy", "Sadie"]
 }
+
+CATEGORY_PROMPTS = {
+    "project": "creative software project names that are memorable and modern",
+    "variable": "clean, descriptive variable names following camelCase convention",
+    "company": "catchy tech startup company names that are brandable",
+    "pet": "cute and friendly pet names"
+}
+
+
+def generate_names_with_llm(category: str, context: str, count: int) -> list[str]:
+    """Generate names using OpenRouter API."""
+    if not OPENROUTER_API_KEY:
+        return None
+
+    category_desc = CATEGORY_PROMPTS.get(category, CATEGORY_PROMPTS["project"])
+
+    prompt = f"""Generate exactly {count} {category_desc}.
+{f'Context/theme: {context}' if context else ''}
+
+Return ONLY a JSON array of strings, nothing else. Example: ["Name1", "Name2", "Name3"]"""
+
+    try:
+        response = requests.post(
+            OPENROUTER_BASE_URL,
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://namewrite.app",
+                "X-Title": "NameWrite"
+            },
+            json={
+                "model": "openai/gpt-3.5-turbo",  # Fast and cheap default
+                "messages": [
+                    {"role": "system", "content": "You are a creative naming assistant. Always respond with only a valid JSON array of strings."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.8,
+                "max_tokens": 200
+            },
+            timeout=10
+        )
+        response.raise_for_status()
+
+        result = response.json()
+        content = result["choices"][0]["message"]["content"].strip()
+
+        # Parse the JSON array from response
+        names = json.loads(content)
+        if isinstance(names, list) and all(isinstance(n, str) for n in names):
+            return names[:count]
+    except Exception as e:
+        app.logger.warning(f"OpenRouter API error: {e}")
+
+    return None
 
 
 @app.route("/")
@@ -38,7 +88,7 @@ def index():
 @app.route("/api/categories")
 def get_categories():
     """Return available naming categories."""
-    return jsonify(list(NAMING_CATEGORIES.keys()))
+    return jsonify(list(CATEGORY_PROMPTS.keys()))
 
 
 @app.route("/api/generate", methods=["POST"])
@@ -49,20 +99,30 @@ def generate_names():
     context = data.get("context", "")
     count = min(data.get("count", 5), 10)
 
-    # Get base suggestions from category
-    base_names = NAMING_CATEGORIES.get(category, NAMING_CATEGORIES["project"])
-    suggestions = random.sample(base_names, min(count, len(base_names)))
+    # Try LLM generation first
+    suggestions = generate_names_with_llm(category, context, count)
+    used_llm = suggestions is not None
 
-    # Add context-based variations if context provided
-    if context:
-        context_word = context.split()[0].capitalize() if context else ""
-        suggestions = [f"{context_word}{name}" if random.random() > 0.5 else name
-                      for name in suggestions]
+    # Fallback to random names if LLM unavailable
+    if not suggestions:
+        base_names = FALLBACK_NAMES.get(category, FALLBACK_NAMES["project"])
+        suggestions = random.sample(base_names, min(count, len(base_names)))
 
     return jsonify({
         "category": category,
         "context": context,
-        "suggestions": suggestions
+        "suggestions": suggestions,
+        "source": "llm" if used_llm else "fallback"
+    })
+
+
+@app.route("/api/status")
+def status():
+    """Return API status including whether LLM is configured."""
+    return jsonify({
+        "app": "NameWrite",
+        "llm_configured": bool(OPENROUTER_API_KEY),
+        "llm_provider": "OpenRouter" if OPENROUTER_API_KEY else None
     })
 
 
