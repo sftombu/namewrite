@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NameWrite - AI-Powered Naming</title>
+
+    <!-- Vue.js 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <!-- Vuetify CSS & JS -->
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@3.4.0/dist/vuetify.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@3.4.0/dist/vuetify.min.js"></script>
+
+    <!-- Material Design Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.3.67/css/materialdesignicons.min.css" rel="stylesheet">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        [v-cloak] { display: none; }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .name-chip {
+            transition: all 0.3s ease;
+        }
+        .name-chip:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div id="app" v-cloak>
+        <v-app>
+            <!-- App Bar -->
+            <v-app-bar color="primary" elevation="2">
+                <v-app-bar-title>
+                    <v-icon class="mr-2">mdi-pencil-circle</v-icon>
+                    NameWrite
+                </v-app-bar-title>
+                <v-spacer></v-spacer>
+                <v-chip color="success" variant="flat" size="small">
+                    <v-icon start>mdi-check-circle</v-icon>
+                    Online
+                </v-chip>
+            </v-app-bar>
+
+            <!-- Main Content -->
+            <v-main class="bg-grey-lighten-4">
+                <v-container class="py-8">
+                    <!-- Hero Section -->
+                    <v-row justify="center" class="mb-8">
+                        <v-col cols="12" md="8" class="text-center">
+                            <h1 class="text-h3 font-weight-bold mb-4 text-primary">
+                                Find the Perfect Name
+                            </h1>
+                            <p class="text-h6 text-grey-darken-1">
+                                Let AI help you discover creative names for your projects,
+                                variables, companies, and more.
+                            </p>
+                        </v-col>
+                    </v-row>
+
+                    <!-- Name Generator Card -->
+                    <v-row justify="center">
+                        <v-col cols="12" md="8" lg="6">
+                            <v-card elevation="8" rounded="lg">
+                                <v-card-title class="gradient-bg text-white py-4">
+                                    <v-icon class="mr-2">mdi-creation</v-icon>
+                                    Name Generator
+                                </v-card-title>
+
+                                <v-card-text class="pa-6">
+                                    <!-- Category Selection -->
+                                    <v-select
+                                        v-model="selectedCategory"
+                                        :items="categories"
+                                        label="What are you naming?"
+                                        prepend-icon="mdi-shape"
+                                        variant="outlined"
+                                        class="mb-4"
+                                    ></v-select>
+
+                                    <!-- Context Input -->
+                                    <v-text-field
+                                        v-model="context"
+                                        label="Add context (optional)"
+                                        placeholder="e.g., 'fast', 'modern', 'fun'"
+                                        prepend-icon="mdi-text"
+                                        variant="outlined"
+                                        class="mb-4"
+                                        @keyup.enter="generateNames"
+                                    ></v-text-field>
+
+                                    <!-- Count Slider -->
+                                    <div class="mb-6">
+                                        <label class="text-body-2 text-grey-darken-1">
+                                            <v-icon size="small" class="mr-1">mdi-counter</v-icon>
+                                            Number of suggestions: [[ count ]]
+                                        </label>
+                                        <v-slider
+                                            v-model="count"
+                                            :min="1"
+                                            :max="10"
+                                            :step="1"
+                                            color="primary"
+                                            thumb-label
+                                        ></v-slider>
+                                    </div>
+
+                                    <!-- Generate Button -->
+                                    <v-btn
+                                        @click="generateNames"
+                                        color="primary"
+                                        size="x-large"
+                                        block
+                                        :loading="loading"
+                                        :disabled="!selectedCategory"
+                                    >
+                                        <v-icon start>mdi-lightning-bolt</v-icon>
+                                        Generate Names
+                                    </v-btn>
+                                </v-card-text>
+                            </v-card>
+                        </v-col>
+                    </v-row>
+
+                    <!-- Results Section -->
+                    <v-row justify="center" class="mt-8" v-if="suggestions.length > 0">
+                        <v-col cols="12" md="8" lg="6">
+                            <v-card elevation="4" rounded="lg">
+                                <v-card-title class="bg-success text-white">
+                                    <v-icon class="mr-2">mdi-lightbulb-on</v-icon>
+                                    Your Name Suggestions
+                                </v-card-title>
+
+                                <v-card-text class="pa-6">
+                                    <div class="d-flex flex-wrap ga-3">
+                                        <v-chip
+                                            v-for="(name, index) in suggestions"
+                                            :key="index"
+                                            size="x-large"
+                                            color="primary"
+                                            variant="elevated"
+                                            class="name-chip"
+                                            @click="copyToClipboard(name)"
+                                        >
+                                            <v-icon start>mdi-tag</v-icon>
+                                            [[ name ]]
+                                            <v-icon end size="small">mdi-content-copy</v-icon>
+                                        </v-chip>
+                                    </div>
+
+                                    <v-alert
+                                        v-if="copiedName"
+                                        type="success"
+                                        variant="tonal"
+                                        class="mt-4"
+                                        density="compact"
+                                    >
+                                        <v-icon start>mdi-check</v-icon>
+                                        Copied "[[ copiedName ]]" to clipboard!
+                                    </v-alert>
+                                </v-card-text>
+                            </v-card>
+                        </v-col>
+                    </v-row>
+
+                    <!-- History Section -->
+                    <v-row justify="center" class="mt-8" v-if="history.length > 0">
+                        <v-col cols="12" md="8" lg="6">
+                            <v-expansion-panels>
+                                <v-expansion-panel>
+                                    <v-expansion-panel-title>
+                                        <v-icon class="mr-2">mdi-history</v-icon>
+                                        Recent Searches ([[ history.length ]])
+                                    </v-expansion-panel-title>
+                                    <v-expansion-panel-text>
+                                        <v-list density="compact">
+                                            <v-list-item
+                                                v-for="(item, index) in history"
+                                                :key="index"
+                                            >
+                                                <template v-slot:prepend>
+                                                    <v-icon color="primary">mdi-clock-outline</v-icon>
+                                                </template>
+                                                <v-list-item-title>
+                                                    [[ item.category ]]
+                                                </v-list-item-title>
+                                                <v-list-item-subtitle>
+                                                    [[ item.suggestions.join(', ') ]]
+                                                </v-list-item-subtitle>
+                                            </v-list-item>
+                                        </v-list>
+                                    </v-expansion-panel-text>
+                                </v-expansion-panel>
+                            </v-expansion-panels>
+                        </v-col>
+                    </v-row>
+                </v-container>
+            </v-main>
+
+            <!-- Footer -->
+            <v-footer class="bg-grey-darken-4 text-white">
+                <v-row justify="center" no-gutters>
+                    <v-col class="text-center py-4" cols="12">
+                        <v-icon class="mr-2">mdi-heart</v-icon>
+                        Built with Flask, Vue.js & Vuetify
+                    </v-col>
+                </v-row>
+            </v-footer>
+
+            <!-- Snackbar for errors -->
+            <v-snackbar v-model="showError" color="error" :timeout="3000">
+                [[ errorMessage ]]
+                <template v-slot:actions>
+                    <v-btn variant="text" @click="showError = false">Close</v-btn>
+                </template>
+            </v-snackbar>
+        </v-app>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+        const { createVuetify } = Vuetify;
+
+        const vuetify = createVuetify({
+            theme: {
+                defaultTheme: 'light',
+                themes: {
+                    light: {
+                        colors: {
+                            primary: '#667eea',
+                            secondary: '#764ba2',
+                        }
+                    }
+                }
+            }
+        });
+
+        const app = createApp({
+            delimiters: ['[[', ']]'],
+            setup() {
+                const categories = ref([]);
+                const selectedCategory = ref('');
+                const context = ref('');
+                const count = ref(5);
+                const suggestions = ref([]);
+                const loading = ref(false);
+                const history = ref([]);
+                const copiedName = ref('');
+                const showError = ref(false);
+                const errorMessage = ref('');
+
+                const fetchCategories = async () => {
+                    try {
+                        const response = await fetch('/api/categories');
+                        categories.value = await response.json();
+                        if (categories.value.length > 0) {
+                            selectedCategory.value = categories.value[0];
+                        }
+                    } catch (error) {
+                        showError.value = true;
+                        errorMessage.value = 'Failed to load categories';
+                    }
+                };
+
+                const generateNames = async () => {
+                    if (!selectedCategory.value) return;
+
+                    loading.value = true;
+                    try {
+                        const response = await fetch('/api/generate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                category: selectedCategory.value,
+                                context: context.value,
+                                count: count.value
+                            })
+                        });
+
+                        const data = await response.json();
+                        suggestions.value = data.suggestions;
+
+                        // Add to history
+                        history.value.unshift({
+                            category: data.category,
+                            context: data.context,
+                            suggestions: data.suggestions
+                        });
+
+                        // Keep only last 5 searches
+                        if (history.value.length > 5) {
+                            history.value = history.value.slice(0, 5);
+                        }
+                    } catch (error) {
+                        showError.value = true;
+                        errorMessage.value = 'Failed to generate names';
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const copyToClipboard = async (name) => {
+                    try {
+                        await navigator.clipboard.writeText(name);
+                        copiedName.value = name;
+                        setTimeout(() => copiedName.value = '', 2000);
+                    } catch (error) {
+                        showError.value = true;
+                        errorMessage.value = 'Failed to copy to clipboard';
+                    }
+                };
+
+                onMounted(() => {
+                    fetchCategories();
+                });
+
+                return {
+                    categories,
+                    selectedCategory,
+                    context,
+                    count,
+                    suggestions,
+                    loading,
+                    history,
+                    copiedName,
+                    showError,
+                    errorMessage,
+                    generateNames,
+                    copyToClipboard
+                };
+            }
+        });
+
+        app.use(vuetify);
+        app.mount('#app');
+    </script>
+</body>
+</html>
