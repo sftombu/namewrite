@@ -78,7 +78,14 @@ Return ONLY a JSON array of strings, nothing else. Example: ["Name1", "Name2", "
             app.logger.warning(f"OpenRouter API error: {result['error']}")
             return None
 
-        content = result["choices"][0]["message"]["content"].strip()
+        content = result["choices"][0]["message"]["content"]
+        app.logger.info(f"LLM raw response: '{content}'")
+        content = content.strip()
+
+        # Handle empty response
+        if not content:
+            app.logger.warning("LLM returned empty content")
+            return None
 
         # Parse the JSON array from response
         names = json.loads(content)
